@@ -7,8 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1nr_WXmZE-SA3V0gjuSvdMr_EpAeL94Qv
 """
 
-# hospital_streamlit_dashboard.py
-
 import streamlit as st
 import pandas as pd
 import seaborn as sns
@@ -19,75 +17,76 @@ st.set_page_config(page_title="Hospital Visit Analytics", layout="wide")
 st.title("🏥 Hospital Patient Visit Dashboard")
 st.markdown("Analyze patient visits by time, day, and department to improve staffing and resource planning.")
 
-# Upload section
-uploaded_file = st.file_uploader("📁 Upload your hospital visit data (.csv)", type="csv")
 
-if uploaded_file is not None:
-    try:
-        df = pd.read_csv(uploaded_file)
+@st.cache_data
+def load_data():
+    df = pd.read_csv("Hospital_Patient_Visits_June2024.csv")
+    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d')
+    df['Hour'] = pd.to_datetime(df['Check_In_Time'], format='%H:%M:%S').dt.hour
+    df['Day'] = df['Date'].dt.day_name()
+    return df
 
-        # Fix: explicitly tell pandas the format of the Date column
-        df['Date'] = pd.to_datetime(df['Date'], format='%d-%m-%Y')
-        df['Hour'] = pd.to_datetime(df['Check_In_Time'], format='%H:%M:%S').dt.hour
-        df['Day'] = df['Date'].dt.day_name()
+df = load_data()
 
-        order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-        st.subheader("🕒 Number of Patients by Hour")
-        fig1, ax1 = plt.subplots()
-        sns.countplot(x='Hour', data=df, palette='viridis', ax=ax1)
-        ax1.set_title('Patients per Hour')
-        st.pyplot(fig1)
+# Visualization 1: Number of Patients by Hour
+st.subheader("🕒 Number of Patients by Hour")
+fig1, ax1 = plt.subplots()
+sns.countplot(x='Hour', data=df, palette='viridis', ax=ax1)
+ax1.set_title('Patients per Hour')
+st.pyplot(fig1)
 
-        st.subheader("📅 Number of Patients by Day of the Week")
-        fig2, ax2 = plt.subplots()
-        sns.countplot(x='Day', data=df, order=order, palette='coolwarm', ax=ax2)
-        ax2.set_title('Patients per Day')
-        st.pyplot(fig2)
+# Visualization 2: Number of Patients by Day
+st.subheader("📅 Number of Patients by Day of the Week")
+fig2, ax2 = plt.subplots()
+sns.countplot(x='Day', data=df, order=order, palette='coolwarm', ax=ax2)
+ax2.set_title('Patients per Day')
+st.pyplot(fig2)
 
-        st.subheader("🏥 Most Visited Departments")
-        fig3, ax3 = plt.subplots()
-        sns.countplot(x='Department', data=df, palette='Set2', ax=ax3)
-        ax3.set_title('Department Visit Frequency')
-        ax3.tick_params(axis='x', rotation=45)
-        st.pyplot(fig3)
+# Visualization 3: Most Visited Departments
+st.subheader("🏥 Most Visited Departments")
+fig3, ax3 = plt.subplots()
+sns.countplot(x='Department', data=df, palette='Set2', ax=ax3)
+ax3.set_title('Department Visit Frequency')
+ax3.tick_params(axis='x', rotation=45)
+st.pyplot(fig3)
 
-        st.subheader("⏰ Patient Visits Heatmap (Day vs Hour)")
-        heatmap_data = df.groupby(['Day', 'Hour']).size().unstack().fillna(0)
-        heatmap_data = heatmap_data.reindex(order)
+# Visualization 4: Heatmap of Day vs Hour
+st.subheader("⏰ Patient Visits Heatmap (Day vs Hour)")
+heatmap_data = df.groupby(['Day', 'Hour']).size().unstack().fillna(0)
+heatmap_data = heatmap_data.reindex(order)
 
-        fig4, ax4 = plt.subplots(figsize=(12, 6))
-        sns.heatmap(heatmap_data, cmap='YlGnBu', annot=True, fmt='.0f', ax=ax4)
-        ax4.set_title("Heatmap of Patient Visits")
-        st.pyplot(fig4)
+fig4, ax4 = plt.subplots(figsize=(12, 6))
+sns.heatmap(heatmap_data, cmap='YlGnBu', annot=True, fmt='.0f', ax=ax4)
+ax4.set_title("Heatmap of Patient Visits")
+st.pyplot(fig4)
 
-        # Top time slots summary
-        st.subheader("📊 Peak Periods Summary")
+# Summary Tables
+st.subheader("📊 Peak Periods Summary")
 
-        peak_summary = df.groupby(['Day', 'Hour']).size().reset_index(name='Patient_Count')
-        peak_summary['Day_Hour'] = peak_summary['Day'] + ' - ' + peak_summary['Hour'].astype(str) + ":00"
-        most_crowded = peak_summary.sort_values('Patient_Count', ascending=False).head(5)
+# Peak time slots
+peak_summary = df.groupby(['Day', 'Hour']).size().reset_index(name='Patient_Count')
+peak_summary['Day_Hour'] = peak_summary['Day'] + ' - ' + peak_summary['Hour'].astype(str) + ":00"
+most_crowded = peak_summary.sort_values('Patient_Count', ascending=False).head(5)
 
-        st.markdown("### 🔝 Top 5 Most Crowded Time Slots")
-        st.dataframe(most_crowded[['Day_Hour', 'Patient_Count']])
+st.markdown("### 🔝 Top 5 Most Crowded Time Slots")
+st.dataframe(most_crowded[['Day_Hour', 'Patient_Count']])
 
-        hour_summary = df.groupby('Hour').size().reset_index(name='Total_Visits').sort_values(by='Total_Visits', ascending=False)
-        day_summary = df.groupby('Day').size().reset_index(name='Total_Visits').sort_values(by='Total_Visits', ascending=False)
+# Hourly summary
+hour_summary = df.groupby('Hour').size().reset_index(name='Total_Visits').sort_values(by='Total_Visits', ascending=False)
 
-        col1, col2 = st.columns(2)
+# Daily summary
+day_summary = df.groupby('Day').size().reset_index(name='Total_Visits').sort_values(by='Total_Visits', ascending=False)
+day_summary['Day'] = pd.Categorical(day_summary['Day'], categories=order, ordered=True)
+day_summary = day_summary.sort_values('Day')
 
-        with col1:
-            st.markdown("### 📈 Hourly Summary (Most to Least Busy)")
-            st.dataframe(hour_summary)
+col1, col2 = st.columns(2)
 
-        with col2:
-            st.markdown("### 📅 Daily Summary (Most to Least Busy)")
-            st.dataframe(day_summary)
+with col1:
+    st.markdown("### 📈 Hourly Summary (Most to Least Busy)")
+    st.dataframe(hour_summary)
 
-    except Exception as e:
-        st.error(f"Error: {e}")
-
-else:
-    st.info("👆 Upload your dataset to see insights.")
-
-"""Now that `streamlit` is installed, you can run the previous cell again."""
+with col2:
+    st.markdown("### 📅 Daily Summary (Most to Least Busy)")
+    st.dataframe(day_summary)
